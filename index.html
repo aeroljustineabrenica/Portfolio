@@ -1,68 +1,15 @@
-<?php
-declare(strict_types=1);
-
-/* =====================================================================
- *  Portfolio — server-rendered shell.
- *  Personal content comes from config.php; GitHub projects/stats are
- *  fetched live by assets/js/app.js from the JSON API.
- * ===================================================================== */
-
-$cfg = require __DIR__ . '/config.php';
-
-function c(string $key, mixed $default = ''): mixed
-{
-    global $cfg;
-    $node = $cfg;
-    foreach (explode('.', $key) as $part) {
-        if (is_array($node) && array_key_exists($part, $node)) {
-            $node = $node[$part];
-        } else {
-            return $default;
-        }
-    }
-    return $node;
-}
-
-$e  = static fn (mixed $s): string => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
-
-$name        = (string) c('name', 'Your Name');
-$initials    = strtoupper((string) c('initials', 'YN'));
-$role        = (string) c('role', 'Developer');
-$tagline     = (string) c('tagline', '');
-$bio         = (string) c('bio', '');
-$email       = (string) c('email', '');
-$location    = (string) c('location', '');
-$avatar      = trim((string) c('avatar_url', ''));
-$resume      = trim((string) c('resume_url', ''));
-$githubUser  = trim((string) c('github_username', ''));
-$linkedin    = trim((string) c('linkedin_url', ''));
-$website     = trim((string) c('website_url', ''));
-$roles       = (array) c('roles', []);
-$skills      = (array) c('skills', []);
-$status      = (array) c('status', ['available' => false, 'note' => '']);
-
-$githubUrl   = ($githubUser !== '' && $githubUser !== 'your-github-username')
-    ? 'https://github.com/' . rawurlencode($githubUser)
-    : 'https://github.com';
-
-$faviconSvg = sprintf(
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#7c6cf6"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs><rect width="64" height="64" rx="14" fill="url(#g)"/><text x="32" y="42" font-family="Arial,Helvetica,sans-serif" font-size="26" font-weight="700" fill="#fff" text-anchor="middle">%s</text></svg>',
-    $e($initials)
-);
-$favicon = 'data:image/svg+xml,' . rawurlencode($faviconSvg);
-?>
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="<?= $e($tagline) ?>">
-    <meta name="author" content="<?= $e($name) ?>">
-    <meta property="og:title" content="<?= $e($name) ?> — <?= $e($role) ?>">
-    <meta property="og:description" content="<?= $e($tagline) ?>">
+    <meta name="description" content="I design and build fast, accessible, full-stack web applications — from database schema to pixel-perfect UI.">
+    <meta name="author" content="Aerol Justine M. Abrenica">
+    <meta property="og:title" content="Aerol Justine M. Abrenica — Software Developer">
+    <meta property="og:description" content="I design and build fast, accessible, full-stack web applications — from database schema to pixel-perfect UI.">
     <meta property="og:type" content="website">
-    <title><?= $e($name) ?> — <?= $e($role) ?></title>
-    <link rel="icon" href="<?= $e($favicon) ?>">
+    <title>Aerol Justine M. Abrenica — Software Developer</title>
+    <link rel="icon" href="data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3e%3cdefs%3e%3clinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3e%3cstop stop-color='%237c6cf6'/%3e%3cstop offset='1' stop-color='%2322d3ee'/%3e%3c/linearGradient%3e%3c/defs%3e%3crect width='64' height='64' rx='14' fill='url(%23g)'/%3e%3ctext x='32' y='42' font-family='Arial,Helvetica,sans-serif' font-size='26' font-weight='700' fill='%23fff' text-anchor='middle'%3eAJ%3c/text%3e%3c/svg%3e">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
@@ -158,8 +105,8 @@ $favicon = 'data:image/svg+xml,' . rawurlencode($faviconSvg);
 <header class="nav" id="nav">
     <div class="container nav-inner">
         <a href="#home" class="nav-logo" aria-label="Home">
-            <span class="logo-mark"><?= $e($initials) ?></span>
-            <span class="logo-text"><?= $e($name) ?></span>
+            <span class="logo-mark">AJ</span>
+            <span class="logo-text">Aerol Justine M. Abrenica</span>
         </a>
 
         <nav class="nav-links" id="nav-links" aria-label="Primary">
@@ -174,11 +121,6 @@ $favicon = 'data:image/svg+xml,' . rawurlencode($faviconSvg);
                 <svg class="icon icon-sun"><use href="#i-sun"/></svg>
                 <svg class="icon icon-moon"><use href="#i-moon"/></svg>
             </button>
-            <?php if ($resume !== ''): ?>
-                <a class="btn btn-ghost btn-sm nav-resume" href="<?= $e($resume) ?>" target="_blank" rel="noopener">
-                    <svg class="icon"><use href="#i-download"/></svg> Resume
-                </a>
-            <?php endif; ?>
             <a class="btn btn-primary btn-sm nav-hire" href="#contact">Message me</a>
             <button class="icon-btn nav-burger" id="nav-burger" type="button" aria-label="Open menu" aria-expanded="false">
                 <svg class="icon icon-burger"><use href="#i-menu"/></svg>
@@ -193,35 +135,28 @@ $favicon = 'data:image/svg+xml,' . rawurlencode($faviconSvg);
     <!-- ── Hero ────────────────────────────────────────────────────── -->
     <section class="hero" id="home">
         <div class="container hero-inner">
-            <?php if (!empty($status['available'])): ?>
-                <span class="pill status-pill reveal">
-                    <span class="pulse-dot"></span>
-                    <?= $e($status['note'] ?? 'Available for work') ?>
-                </span>
-            <?php endif; ?>
+            <span class="pill status-pill reveal">
+                <span class="pulse-dot"></span>
+                Available for internships &amp; freelance work
+            </span>
 
             <h1 class="hero-title reveal">
-                Hi, I'm <span class="grad-text" id="hero-name"><?= $e($name) ?></span>
+                Hi, I'm <span class="grad-text" id="hero-name">Aerol Justine M. Abrenica</span>
             </h1>
 
             <p class="hero-role reveal" aria-live="polite">
-                <span class="hero-role-label">I am a&nbsp;</span><span id="typewriter" class="type-text"><?= $e($roles[0] ?? $role) ?></span><span class="caret" aria-hidden="true"></span>
+                <span class="hero-role-label">I am a&nbsp;</span><span id="typewriter" class="type-text">Software Developer</span><span class="caret" aria-hidden="true"></span>
             </p>
 
-            <p class="hero-tagline reveal"><?= $e($tagline) ?></p>
+            <p class="hero-tagline reveal">I design and build fast, accessible, full-stack web applications — from database schema to pixel-perfect UI.</p>
 
             <div class="hero-cta reveal">
                 <a href="#projects" class="btn btn-primary btn-lg">
                     <svg class="icon"><use href="#i-folder"/></svg> View my work
                 </a>
-                <a href="<?= $e($githubUrl) ?>" class="btn btn-ghost btn-lg" id="hero-github" target="_blank" rel="noopener">
+                <a href="https://github.com/aeroljustineabrenica" class="btn btn-ghost btn-lg" id="hero-github" target="_blank" rel="noopener">
                     <svg class="icon"><use href="#i-github"/></svg> GitHub
                 </a>
-                <?php if ($resume !== ''): ?>
-                    <a href="<?= $e($resume) ?>" class="btn btn-ghost btn-lg" target="_blank" rel="noopener">
-                        <svg class="icon"><use href="#i-download"/></svg> Résumé
-                    </a>
-                <?php endif; ?>
             </div>
 
             <div class="hero-stats reveal" id="hero-stats">
@@ -260,89 +195,79 @@ $favicon = 'data:image/svg+xml,' . rawurlencode($faviconSvg);
             <div class="about-grid">
                 <aside class="about-visual card reveal">
                     <div class="avatar-ring">
-                        <?php if ($avatar !== ''): ?>
-                            <img class="avatar-img" src="<?= $e($avatar) ?>" alt="<?= $e($name) ?>" width="180" height="180">
-                        <?php else: ?>
-                            <div class="avatar-initials" aria-hidden="true"><?= $e($initials) ?></div>
-                        <?php endif; ?>
+                        <div class="avatar-initials" aria-hidden="true">AJ</div>
                     </div>
 
-                    <h3 class="about-visual-name"><?= $e($name) ?></h3>
-                    <p class="about-visual-role"><?= $e($role) ?></p>
+                    <h3 class="about-visual-name">Aerol Justine M. Abrenica</h3>
+                    <p class="about-visual-role">Software Developer</p>
 
                     <ul class="fact-list">
                         <li>
                             <svg class="icon"><use href="#i-pin"/></svg>
-                            <span><?= $e($location !== '' ? $location : 'Your City, Country') ?></span>
+                            <span>Lipa City, Batangas, Philippines</span>
                         </li>
                         <li>
                             <svg class="icon"><use href="#i-mail"/></svg>
-                            <a href="mailto:<?= $e($email) ?>"><?= $e($email) ?></a>
+                            <a href="mailto:abrenicaaeroljustine@gmail.com">abrenicaaeroljustine@gmail.com</a>
                         </li>
-                        <?php
-                        $education = (string) c('education', '');
-                        if ($education !== '' && !str_starts_with($education, 'Your Degree,')):
-                        ?>
                         <li>
                             <svg class="icon"><use href="#i-book"/></svg>
-                            <span><?= $e($education) ?></span>
+                            <span>3rd Year, BSCS student — Lipa City Colleges</span>
                         </li>
-                        <?php endif; ?>
                     </ul>
 
                     <div class="social-row">
-                        <a class="social-btn" href="<?= $e($githubUrl) ?>" target="_blank" rel="noopener" aria-label="GitHub">
+                        <a class="social-btn" href="https://github.com/aeroljustineabrenica" target="_blank" rel="noopener" aria-label="GitHub">
                             <svg class="icon"><use href="#i-github"/></svg>
                         </a>
-                        <?php if ($linkedin !== ''): ?>
-                            <a class="social-btn" href="<?= $e($linkedin) ?>" target="_blank" rel="noopener" aria-label="LinkedIn">
-                                <svg class="icon"><use href="#i-linkedin"/></svg>
-                            </a>
-                        <?php endif; ?>
-                        <a class="social-btn" href="mailto:<?= $e($email) ?>" aria-label="Email">
+                        <a class="social-btn" href="https://www.linkedin.com/in/aerol-justine-abrenica-003523435/" target="_blank" rel="noopener" aria-label="LinkedIn">
+                            <svg class="icon"><use href="#i-linkedin"/></svg>
+                        </a>
+                        <a class="social-btn" href="mailto:abrenicaaeroljustine@gmail.com" aria-label="Email">
                             <svg class="icon"><use href="#i-mail"/></svg>
                         </a>
-                        <?php if ($website !== ''): ?>
-                            <a class="social-btn" href="<?= $e($website) ?>" target="_blank" rel="noopener" aria-label="Website">
-                                <svg class="icon"><use href="#i-external"/></svg>
-                            </a>
-                        <?php endif; ?>
                     </div>
                 </aside>
 
                 <div class="about-content reveal">
                     <p class="about-lead">
-                        I'm a <strong><?= $e($role) ?></strong> who enjoys the entire stack — from
+                        I'm a <strong>Software Developer</strong> who enjoys the entire stack — from
                         designing relational schemas and building resilient APIs, to crafting
                         interfaces that feel fast and intuitive.
                     </p>
-                    <p class="about-bio"><?= $e($bio) ?></p>
+                    <p class="about-bio">Hello! I'm Aerol Justine Abrenica, a passionate developer who loves turning ideas into real, working products. I enjoy the full-cycle of web development: architecting databases, and making front-ends that feel effortless to use. This portfolio is a static site hosted on GitHub Pages — it pulls my projects straight from the GitHub API and caches them in your browser, so there's no server to maintain.</p>
 
                     <div class="skills" id="skills">
-                        <?php foreach ($skills as $group => $items): if (empty($items)) continue; ?>
-                            <div class="skill-group">
-                                <h4 class="skill-group-title"><?= $e($group) ?></h4>
-                                <div class="chip-row">
-                                    <?php foreach ((array) $items as $skill): ?>
-                                        <span class="chip"><?= $e($skill) ?></span>
-                                    <?php endforeach; ?>
-                                </div>
+                        <div class="skill-group">
+                            <h4 class="skill-group-title">Languages</h4>
+                            <div class="chip-row">
+                                <span class="chip">PHP</span><span class="chip">JavaScript</span><span class="chip">HTML</span><span class="chip">CSS</span>
                             </div>
-                        <?php endforeach; ?>
-
-                        <?php
-                        $interests = array_values(array_filter(array_map('strval', (array) c('interests', []))));
-                        if ($interests !== []):
-                        ?>
+                        </div>
+                        <div class="skill-group">
+                            <h4 class="skill-group-title">Frameworks &amp; Tools</h4>
+                            <div class="chip-row">
+                                <span class="chip">Bootstrap</span><span class="chip">jQuery</span>
+                            </div>
+                        </div>
+                        <div class="skill-group">
+                            <h4 class="skill-group-title">Databases</h4>
+                            <div class="chip-row">
+                                <span class="chip">MySQL</span>
+                            </div>
+                        </div>
+                        <div class="skill-group">
+                            <h4 class="skill-group-title">Other Skills</h4>
+                            <div class="chip-row">
+                                <span class="chip">Git &amp; GitHub</span><span class="chip">UI/UX</span>
+                            </div>
+                        </div>
                         <div class="skill-group">
                             <h4 class="skill-group-title">Interests</h4>
                             <div class="chip-row">
-                                <?php foreach ($interests as $interest): ?>
-                                    <span class="chip"><?= $e($interest) ?></span>
-                                <?php endforeach; ?>
+                                <span class="chip">Open Source</span><span class="chip">UI/UX Design</span><span class="chip">Problem Solving</span>
                             </div>
                         </div>
-                        <?php endif; ?>
                     </div>
                 </div>
             </div>
@@ -356,8 +281,8 @@ $favicon = 'data:image/svg+xml,' . rawurlencode($faviconSvg);
                 <span class="section-eyebrow">Synced live from GitHub</span>
                 <h2 class="section-title">Featured <span class="grad-text">Projects</span></h2>
                 <p class="section-sub">
-                    These repositories are fetched from the GitHub API by my PHP backend and
-                    cached in MySQL — refresh to pull the latest.
+                    These repositories are fetched straight from the GitHub API in your
+                    browser and cached locally — press refresh to pull the latest.
                 </p>
             </header>
 
@@ -400,7 +325,7 @@ $favicon = 'data:image/svg+xml,' . rawurlencode($faviconSvg);
                 <h2 class="section-title">Get in <span class="grad-text">Touch</span></h2>
                 <p class="section-sub">
                     Have a project in mind, a question, or just want to say hi?
-                    Drop a message — it's stored securely in my portfolio's MySQL database.
+                    Send a message — it opens your email app and goes straight to my inbox.
                 </p>
             </header>
 
@@ -443,24 +368,22 @@ $favicon = 'data:image/svg+xml,' . rawurlencode($faviconSvg);
                         <ul class="fact-list">
                             <li>
                                 <svg class="icon"><use href="#i-mail"/></svg>
-                                <a href="mailto:<?= $e($email) ?>"><?= $e($email) ?></a>
+                                <a href="mailto:abrenicaaeroljustine@gmail.com">abrenicaaeroljustine@gmail.com</a>
                             </li>
                             <li>
                                 <svg class="icon"><use href="#i-pin"/></svg>
-                                <span><?= $e($location !== '' ? $location : 'Your City, Country') ?></span>
+                                <span>Lipa City, Batangas, Philippines</span>
                             </li>
                         </ul>
 
                         <div class="social-row">
-                            <a class="social-btn" href="<?= $e($githubUrl) ?>" target="_blank" rel="noopener" aria-label="GitHub">
+                            <a class="social-btn" href="https://github.com/aeroljustineabrenica" target="_blank" rel="noopener" aria-label="GitHub">
                                 <svg class="icon"><use href="#i-github"/></svg>
                             </a>
-                            <?php if ($linkedin !== ''): ?>
-                                <a class="social-btn" href="<?= $e($linkedin) ?>" target="_blank" rel="noopener" aria-label="LinkedIn">
-                                    <svg class="icon"><use href="#i-linkedin"/></svg>
-                                </a>
-                            <?php endif; ?>
-                            <a class="social-btn" href="mailto:<?= $e($email) ?>" aria-label="Email">
+                            <a class="social-btn" href="https://www.linkedin.com/in/aerol-justine-abrenica-003523435/" target="_blank" rel="noopener" aria-label="LinkedIn">
+                                <svg class="icon"><use href="#i-linkedin"/></svg>
+                            </a>
+                            <a class="social-btn" href="mailto:abrenicaaeroljustine@gmail.com" aria-label="Email">
                                 <svg class="icon"><use href="#i-mail"/></svg>
                             </a>
                         </div>
@@ -469,8 +392,8 @@ $favicon = 'data:image/svg+xml,' . rawurlencode($faviconSvg);
                     <div class="card tech-badge">
                         <svg class="icon"><use href="#i-check"/></svg>
                         <div>
-                            <strong>Powered by a real stack</strong>
-                            <p>PHP 8 · MySQL · REST API · GitHub API · Vanilla JS</p>
+                            <strong>Hosted on GitHub Pages</strong>
+                            <p>GitHub Pages · GitHub REST API · Vanilla JS — no server to maintain</p>
                         </div>
                     </div>
                 </aside>
@@ -483,10 +406,10 @@ $favicon = 'data:image/svg+xml,' . rawurlencode($faviconSvg);
 <footer class="footer">
     <div class="container footer-inner">
         <div class="footer-brand">
-            <span class="logo-mark sm"><?= $e($initials) ?></span>
-            <span>© <span id="year"><?= date('Y') ?></span> <?= $e($name) ?>. All rights reserved.</span>
+            <span class="logo-mark sm">AJ</span>
+            <span>© <span id="year">2026</span> Aerol Justine M. Abrenica. All rights reserved.</span>
         </div>
-        <p class="footer-note">Built with <strong>PHP</strong>, <strong>MySQL</strong> &amp; the <strong>GitHub API</strong></p>
+        <p class="footer-note">Built with <strong>Vanilla JS</strong> &amp; the <strong>GitHub API</strong> — hosted on <strong>GitHub Pages</strong></p>
         <a href="#home" class="footer-top">Back to top ↑</a>
     </div>
 </footer>
@@ -532,8 +455,9 @@ $favicon = 'data:image/svg+xml,' . rawurlencode($faviconSvg);
 <div class="toast-wrap" id="toasts" role="status" aria-live="polite"></div>
 
 <!-- Data for the JS layer -->
-<script id="roles-data" type="application/json"><?= json_encode(array_values($roles), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?></script>
+<script id="roles-data" type="application/json">["Software Developer"]</script>
 
+<script src="assets/js/config.js" defer></script>
 <script src="assets/js/app.js" defer></script>
 <script src="assets/js/chat.js" defer></script>
 </body>

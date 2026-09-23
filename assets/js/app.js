@@ -2,9 +2,18 @@
    Portfolio — app.js
    Progressive enhancement layer: theme, motion, live GitHub projects,
    stat counters, search/filters and the contact form.
+
+   This static build runs on GitHub Pages: it talks to the public GitHub
+   REST API directly from the browser, and caches the responses in
+   localStorage so visitors rarely touch the API rate limit.
    ===================================================================== */
 (function () {
     'use strict';
+
+    const CFG = window.PORTFOLIO_CONFIG || {};
+    const GITHUB_USER = String(CFG.github_username || '').trim();
+    const GH_BASE = 'https://api.github.com';
+    const GH_TTL = Number(CFG.github && CFG.github.sync_ttl) || 3600;
 
     /* ------------------------------------------------------------ Utils */
     const $  = (sel, root = document) => root.querySelector(sel);
@@ -53,6 +62,67 @@
         const days = Math.floor(hours / 24);
         if (days < 30) return `${days} day${days === 1 ? '' : 's'} ago`;
         return formatDate(iso);
+    }
+
+    /* ------------------------------------------------ localStorage cache */
+    function readCache(key, ttlSeconds) {
+        try {
+            const raw = localStorage.getItem(key);
+            if (!raw) return null;
+            const entry = JSON.parse(raw);
+            if (!entry || !Array.isArray(entry.data)) return null;
+            const age = (Date.now() - new Date(entry.syncedAt).getTime()) / 1000;
+            const stale = Number.isFinite(ttlSeconds) && ttlSeconds >= 0 && age > ttlSeconds;
+            return { data: entry.data, syncedAt: entry.syncedAt, stale };
+        } catch (_) {
+            return null;
+        }
+    }
+
+    function writeCache(key, data) {
+        try {
+            localStorage.setItem(key, JSON.stringify({
+                syncedAt: new Date().toISOString(),
+                data,
+            }));
+        } catch (_) {}
+    }
+
+    function isConfigured() {
+        return GITHUB_USER !== '' && GITHUB_USER.toLowerCase() !== 'your-github-username';
+    }
+
+    async function ghFetch(path) {
+        const res = await fetch(GH_BASE + path, {
+            headers: {
+                Accept: 'application/vnd.github+json',
+                'X-GitHub-Api-Version': '2022-11-28',
+            },
+        });
+        const json = await res.json().catch(() => ({}));
+
+        if (res.status === 404) {
+            throw new Error(`GitHub user "${GITHUB_USER}" was not found — check github_username in assets/js/config.js.`);
+        }
+        if (res.status === 403 || res.status === 429) {
+            throw new Error('GitHub API rate limit reached — projects are shown from cache. Try again in a little while.');
+        }
+        if (!res.ok) {
+            throw new Error(`GitHub API error (HTTP ${res.status}).`);
+        }
+
+        let rate = null;
+        for (const h of ['x-ratelimit-remaining', 'x-ratelimit-limit']) {
+            try {
+                const v = res.headers.get(h);
+                if (v !== null) {
+                    rate = rate || {};
+                    rate[h === 'x-ratelimit-remaining' ? 'remaining' : 'limit'] = Number(v);
+                }
+            } catch (_) {}
+        }
+
+        return { json, rate };
     }
 
     /* ------------------------------------------------------------ Toasts */
@@ -241,6 +311,7 @@
         requestAnimationFrame(frame);
     }
 
+    // Only animates the stats that are actually provided.
     function renderStats(stats) {
         if (!stats) return;
         const map = {
@@ -250,6 +321,7 @@
             following: stats.following,
         };
         Object.entries(map).forEach(([key, value]) => {
+            if (value === undefined) return;
             const el = document.querySelector(`[data-stat="${key}"]`);
             if (el) animateCounter(el, value);
         });
@@ -257,32 +329,42 @@
 
     /* ------------------------------------------------------ Profile load */
     async function loadProfile() {
+        if (!isConfigured()) {
+            toast('Set your GitHub username in assets/js/config.js to load your stats.', 'warning', 7000);
+            return null;
+        }
+
+        // Prefer a recent cache — this is what keeps us well under the
+        // unauthenticated GitHub API limit (60 requests/hour per IP).
+        const cached = readCache('pf-profile', GH_TTL);
+        if (cached && !cached.stale) {
+            renderStats(cached.data);
+            return cached.data;
+        }
+
         try {
-            const res = await fetch('api/profile.php', { headers: { Accept: 'application/json' } });
-            const json = await res.json();
+            const { json } = await ghFetch('/users/' + encodeURIComponent(GITHUB_USER));
+            const stats = {
+                public_repos: json.public_repos ?? null,
+                followers: json.followers ?? null,
+                following: json.following ?? null,
+            };
+            writeCache('pf-profile', stats);
+            renderStats(stats);
 
-            if (!json.ok) throw new Error(json.error || 'Profile request failed');
-
-            const p = json.data;
-
-            if (p.name) {
-                $('#hero-name').textContent = p.name;
-                document.title = `${p.name} — ${p.role || 'Portfolio'}`;
+            const avatar = $('#avatar-img');
+            if (avatar && json.avatar_url) {
+                avatar.src = json.avatar_url;
             }
-
-            if (p.github_configured && p.github_url) {
-                const gh = $('#hero-github');
-                if (gh) gh.href = p.github_url;
-            }
-
-            if (p.notice) toast(p.notice, 'warning', 7000);
-
-            // Profile fetch returns project totals too when available
-            renderStats(p.stats);
-
-            return p;
+            return stats;
         } catch (err) {
-            toast(err.message || 'Could not load profile data.', 'error');
+            const fallback = readCache('pf-profile', -1);
+            if (fallback) {
+                renderStats(fallback.data);
+                toast('Showing cached stats — ' + err.message, 'warning', 6000);
+            } else {
+                toast(err.message, 'error');
+            }
             return null;
         }
     }
@@ -301,6 +383,7 @@
     let activeLang = 'All';
     let searchTerm = '';
     let busy = false;
+    let lastRate = null;
 
     function projectCard(p, index) {
         const color = LANG_COLORS[p.language] || defaultLangColor;
@@ -437,6 +520,61 @@
         }
     }
 
+    /* GitHub repo shape → the shape the UI expects (mirrors ProjectStore).
+       Raw fields come straight from the GitHub REST API. */
+    function mapRepo(repo) {
+        return {
+            id: repo.id ?? 0,
+            name: repo.name,
+            full_name: repo.full_name,
+            description: repo.description || 'No description provided.',
+            homepage: repo.homepage || null,
+            html_url: repo.html_url,
+            language: repo.language,
+            stars: repo.stargazers_count ?? 0,
+            forks: repo.forks_count ?? 0,
+            topics: Array.isArray(repo.topics) ? repo.topics : [],
+            is_fork: Boolean(repo.fork),
+            is_archived: Boolean(repo.archived),
+            pushed_at: repo.pushed_at,
+            synced_at: new Date().toISOString(),
+        };
+    }
+
+    async function ghReposAll() {
+        const perPage = 100;
+        const maxPages = 3;
+        const repos = [];
+
+        for (let page = 1; page <= maxPages; page++) {
+            const path = `/users/${encodeURIComponent(GITHUB_USER)}/repos` +
+                `?per_page=${perPage}&page=${page}&sort=pushed&direction=desc`;
+            const { json, rate } = await ghFetch(path);
+            if (rate) lastRate = rate;
+            if (!Array.isArray(json)) break;
+            repos.push(...json);
+            if (json.length < perPage) break;
+        }
+
+        return repos;
+    }
+
+    function filterAndSortRepos(raw) {
+        const g = CFG.github || {};
+        const excludeForks = g.exclude_forks !== false;
+        const minStars = Number(g.min_stars) || 0;
+        const maxRepos = Math.max(1, Number(g.max_repos) || 20);
+
+        const projects = raw
+            .filter((r) => !(excludeForks && r.is_fork))
+            .filter((r) => r.stars >= minStars)
+            .filter((r) => !r.is_archived)
+            .sort((a, b) => b.stars - a.stars || String(b.pushed_at || '').localeCompare(String(a.pushed_at || '')))
+            .slice(0, maxRepos);
+
+        return projects;
+    }
+
     async function loadProjects(forceRefresh = false) {
         if (busy) return;
         busy = true;
@@ -450,33 +588,67 @@
         if (metaLine && forceRefresh) metaLine.textContent = 'Pulling the latest repositories from GitHub…';
 
         try {
-            const url = 'api/projects.php' + (forceRefresh ? '?refresh=1' : '');
-            const res = await fetch(url, { headers: { Accept: 'application/json' } });
-            const json = await res.json();
-
-            if (!json.ok) throw new Error(json.error || 'Failed to load projects');
-
-            allProjects = Array.isArray(json.data) ? json.data : [];
-            setMeta(json.meta || {});
-            renderLangFilters();
-            renderProjects();
-
-            // Refresh hero stats with real repo/star totals
-            if (json.meta && json.meta.source === 'github') {
-                const stars = allProjects.reduce((sum, p) => sum + (p.stars || 0), 0);
-                const starEl = document.querySelector('[data-stat="stars"]');
-                const repoEl = document.querySelector('[data-stat="repos"]');
-                if (starEl) animateCounter(starEl, stars);
-                if (repoEl && allProjects.length > 0) animateCounter(repoEl, allProjects.length);
+            if (!isConfigured()) {
+                setMeta({ configured: false, message: 'Set your GitHub username in assets/js/config.js to display your projects.' });
+                return;
             }
+
+            const cached = readCache('pf-projects', GH_TTL);
+            if (cached && !cached.stale && !forceRefresh) {
+                allProjects = cached.data;
+                setMeta({
+                    configured: true,
+                    source: 'cache',
+                    total: allProjects.length,
+                    synced_at: cached.syncedAt,
+                    rate: null,
+                });
+                renderLangFilters();
+                renderProjects();
+            } else {
+                const raw = await ghReposAll();
+                allProjects = raw.map(mapRepo);
+                allProjects = filterAndSortRepos(allProjects);
+
+                writeCache('pf-projects', allProjects);
+                setMeta({
+                    configured: true,
+                    source: 'github',
+                    total: allProjects.length,
+                    synced_at: new Date().toISOString(),
+                    rate: lastRate,
+                });
+                renderLangFilters();
+                renderProjects();
+            }
+
+            // Refresh hero stats from the loaded projects.
+            const stars = allProjects.reduce((sum, p) => sum + (p.stars || 0), 0);
+            renderStats({ stars, public_repos: allProjects.length });
 
             if (forceRefresh) {
                 toast('Projects synced with GitHub.', 'success');
             }
         } catch (err) {
-            if (metaLine) metaLine.innerHTML = `<span class="dot warn"></span> ${esc(err.message)}`;
-            toast(err.message || 'Could not load projects.', 'error');
-            if (grid) grid.setAttribute('aria-busy', 'false');
+            // Fall back to whatever is cached so the section still renders.
+            const fallback = readCache('pf-projects', -1);
+            if (fallback && Array.isArray(fallback.data) && fallback.data.length > 0) {
+                allProjects = fallback.data;
+                setMeta({
+                    configured: true,
+                    source: 'cache',
+                    total: allProjects.length,
+                    synced_at: fallback.syncedAt,
+                    warning: err.message,
+                    rate: null,
+                });
+                renderLangFilters();
+                renderProjects();
+            } else {
+                if (metaLine) metaLine.innerHTML = `<span class="dot warn"></span> ${esc(err.message)}`;
+                toast(err.message || 'Could not load projects.', 'error');
+                if (grid) grid.setAttribute('aria-busy', 'false');
+            }
         } finally {
             busy = false;
             if (syncBtn) {
@@ -552,23 +724,35 @@
             btn.disabled = true;
             if (label) label.textContent = 'Sending…';
 
+            const contactCfg = CFG.contact || {};
+
             try {
-                const res = await fetch('api/contact.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-                    body: JSON.stringify(payload),
-                });
-                const json = await res.json();
-
-                if (!json.ok) {
-                    if (json.fields) {
-                        Object.entries(json.fields).forEach(([f, msg]) => setFieldError(f, msg));
+                // Option A: a form service endpoint (e.g. Formspree).
+                if (contactCfg.active && contactCfg.endpoint) {
+                    const fd = new FormData(form);
+                    const res = await fetch(contactCfg.endpoint, {
+                        method: 'POST',
+                        body: fd,
+                        headers: { Accept: 'application/json' },
+                    });
+                    const json = await res.json().catch(() => ({}));
+                    if (!res.ok && !json.ok) {
+                        throw new Error('The message could not be sent. Try email instead.');
                     }
-                    throw new Error(json.error || 'Something went wrong.');
+                    toast('Message sent!', 'success', 6000);
+                    form.reset();
+                } else {
+                    // Option B: fall back to the visitor's email app.
+                    const subject = payload.subject
+                        ? encodeURIComponent(payload.subject)
+                        : encodeURIComponent('Project inquiry');
+                    const body = encodeURIComponent(
+                        `Hi,\n\n${payload.message}\n\n— ${payload.name}\n${payload.email}`
+                    );
+                    window.location.href = `mailto:${CFG.email}?subject=${subject}&body=${body}`;
+                    toast('Opening your email app…', 'success', 6000);
+                    form.reset();
                 }
-
-                toast(json.message || 'Message sent!', 'success', 6000);
-                form.reset();
             } catch (err) {
                 toast(err.message || 'Could not send your message.', 'error');
             } finally {
